@@ -1,0 +1,275 @@
+﻿@page "/WohnungCrud"
+@using Vorbereitung_5.Models
+@rendermode InteractiveServer
+
+<PageTitle>Wohnung CRUD</PageTitle>
+
+<h3>Wohnung CRUD (Select / Insert / Update / Remove)</h3>
+
+<button class="btn btn-primary mb-3" @onclick="SelectAll">Select all</button>
+
+@if (wohnungen == null)
+{
+    <p>Daten noch nicht geladen</p>
+}
+else
+{
+    @foreach (var w in wohnungen)
+    {
+        <h5>
+            ID: @w.WohnungId |
+            Ort: @w.Ort |
+            Zimmer: @w.Zimmer |
+            Fläche: @w.FlaecheQm qm |
+            Miete: @w.MieteChf CHF |
+            Balkon: @(w.Balkon ? "Ja" : "Nein")
+        </h5>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <p class="mt-2 text-info">@statusMessage</p>
+}
+
+<hr />
+
+<h4>Insert</h4>
+
+<div class="mb-2">
+    <label>Ort</label>
+    <input class="form-control" @bind="newWohnung.Ort" />
+</div>
+
+<div class="mb-2">
+    <label>Zimmer</label>
+    <input class="form-control" type="number" @bind="newWohnung.Zimmer" />
+</div>
+
+<div class="mb-2">
+    <label>Fläche (qm)</label>
+    <input class="form-control" type="number" @bind="newWohnung.FlaecheQm" />
+</div>
+
+<div class="mb-2">
+    <label>Miete (CHF)</label>
+    <input class="form-control" type="number" step="0.01" @bind="newWohnung.MieteChf" />
+</div>
+
+<div class="mb-3">
+    <label>Balkon</label>
+    <select class="form-select" @bind="newWohnung.Balkon">
+        <option value="true">Ja</option>
+        <option value="false">Nein</option>
+    </select>
+</div>
+
+<button class="btn btn-success mb-3" @onclick="InsertWohnung">Insert</button>
+
+<hr />
+
+<h4>Update</h4>
+
+<div class="mb-2">
+    <label>Wohnung-ID</label>
+    <input class="form-control" type="number" @bind="searchId" />
+</div>
+
+<button class="btn btn-primary mb-3" @onclick="LoadWohnung">Wohnung laden</button>
+
+@if (editWohnung == null)
+{
+    <p>Keine Wohnung geladen.</p>
+}
+else
+{
+    <div class="border rounded p-3">
+        <div class="mb-2">
+            <label>ID (nur anzeigen)</label>
+            <input class="form-control" value="@editWohnung.WohnungId" disabled />
+        </div>
+
+        <div class="mb-2">
+            <label>Ort</label>
+            <input class="form-control" @bind="editWohnung.Ort" />
+        </div>
+
+        <div class="mb-2">
+            <label>Zimmer</label>
+            <input class="form-control" type="number" @bind="editWohnung.Zimmer" />
+        </div>
+
+        <div class="mb-2">
+            <label>Fläche (qm)</label>
+            <input class="form-control" type="number" @bind="editWohnung.FlaecheQm" />
+        </div>
+
+        <div class="mb-2">
+            <label>Miete (CHF)</label>
+            <input class="form-control" type="number" step="0.01" @bind="editWohnung.MieteChf" />
+        </div>
+
+        <div class="mb-3">
+            <label>Balkon</label>
+            <select class="form-select" @bind="editWohnung.Balkon">
+                <option value="true">Ja</option>
+                <option value="false">Nein</option>
+            </select>
+        </div>
+
+        <button class="btn btn-warning" @onclick="UpdateWohnung">Update</button>
+    </div>
+}
+
+<hr />
+
+<h4>Remove (Dropdown)</h4>
+
+<p role="status">Gelöscht: @deletedCount</p>
+
+@if (wohnungListe == null)
+{
+    <p>Lade Wohnungen…</p>
+}
+else
+{
+    <div class="mb-2">
+        <label class="form-label">Wohnung auswählen</label>
+        <select class="form-select" @bind="removeId">
+            <option value="0">-- bitte auswählen --</option>
+            @foreach (var w in wohnungListe)
+            {
+                <option value="@w.WohnungId">@w.WohnungId - @w.Ort (@w.Zimmer Zi.)</option>
+            }
+        </select>
+    </div>
+
+    <button class="btn btn-danger" @onclick="RemoveWohnung" disabled="@(removeId == 0)">
+        Ausgewählte Wohnung löschen
+    </button>
+}
+
+@code {
+    // Anzeige
+    private IQueryable<Wohnung>? wohnungen;
+    private string? statusMessage;
+
+    // Insert
+    private Wohnung newWohnung = new Wohnung();
+
+    // Update
+    private int? searchId;
+    private Wohnung? editWohnung;
+
+    // Remove
+    private int removeId = 0;
+    private int deletedCount = 0;
+    private List<Wohnung>? wohnungListe;
+
+    // DbContext
+    private MyDbContext myDbContext = new MyDbContext();
+
+    protected override void OnInitialized()
+    {
+        wohnungListe = myDbContext.Set<Wohnung>()
+            .OrderBy(x => x.WohnungId)
+            .ToList();
+    }
+
+    private void RefreshLists()
+    {
+        wohnungen = myDbContext.Set<Wohnung>().Select(x => x);
+
+        wohnungListe = myDbContext.Set<Wohnung>()
+            .OrderBy(x => x.WohnungId)
+            .ToList();
+    }
+
+    private void SelectAll()
+    {
+        statusMessage = string.Empty;
+        wohnungen = myDbContext.Set<Wohnung>().Select(x => x);
+    }
+
+    private void InsertWohnung()
+    {
+        statusMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(newWohnung.Ort))
+        {
+            statusMessage = "Bitte mindestens Ort ausfüllen.";
+            return;
+        }
+
+        myDbContext.Set<Wohnung>().Add(newWohnung);
+        myDbContext.SaveChanges();
+
+        statusMessage = $"Wohnung mit ID {newWohnung.WohnungId} wurde gespeichert.";
+        newWohnung = new Wohnung();
+
+        RefreshLists();
+    }
+
+    private void LoadWohnung()
+    {
+        statusMessage = string.Empty;
+        editWohnung = null;
+
+        if (searchId == null)
+        {
+            statusMessage = "Bitte eine gültige ID eingeben.";
+            return;
+        }
+
+        editWohnung = myDbContext.Set<Wohnung>()
+            .FirstOrDefault(x => x.WohnungId == searchId.Value);
+
+        statusMessage = editWohnung == null
+            ? $"Keine Wohnung mit ID {searchId.Value} gefunden."
+            : $"Wohnung mit ID {searchId.Value} geladen.";
+    }
+
+    private void UpdateWohnung()
+    {
+        if (editWohnung == null)
+        {
+            statusMessage = "Keine Wohnung geladen.";
+            return;
+        }
+
+        myDbContext.SaveChanges();
+        statusMessage = $"Wohnung mit ID {editWohnung.WohnungId} aktualisiert.";
+
+        RefreshLists();
+    }
+
+    private void RemoveWohnung()
+    {
+        statusMessage = string.Empty;
+
+        if (removeId == 0)
+        {
+            statusMessage = "Bitte zuerst eine Wohnung auswählen.";
+            return;
+        }
+
+        var del = myDbContext.Set<Wohnung>()
+            .FirstOrDefault(x => x.WohnungId == removeId);
+
+        if (del != null)
+        {
+            myDbContext.Remove(del);
+            myDbContext.SaveChanges();
+
+            deletedCount++;
+            statusMessage = "Wohnung wurde gelöscht.";
+        }
+        else
+        {
+            statusMessage = "Wohnung nicht gefunden.";
+        }
+
+        removeId = 0;
+        RefreshLists();
+    }
+}
